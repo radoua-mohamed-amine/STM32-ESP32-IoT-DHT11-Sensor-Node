@@ -1,0 +1,457 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dashboard</title>
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Syne:wght@400;500;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <!-- ── Navigation ──────────────────────────────────────────────────── -->
+    <nav>
+      <div class="tab active" onclick="showPage('live', this)">
+        Live dashboard
+      </div>
+      <div class="tab" onclick="showPage('import', this)">
+        Import &amp; analyse
+      </div>
+    </nav>
+
+    <!-- ════════════════════════════════════════════════════════════════════
+     PAGE 1 — LIVE
+     ════════════════════════════════════════════════════════════════════ -->
+    <div id="page-live" class="page active">
+      <div class="hdr">
+        <div>
+          <h1>STM32 + ESP32 · Live</h1>
+          <p>UART → MQTT → WebSocket · DHT11 sensor node</p>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-out" onclick="exportCSV()">
+            ⬇ Export CSV
+          </button>
+        </div>
+      </div>
+
+      <div class="config">
+        <div>
+          <label>Broker IP</label
+          ><input id="ip" value="192.168.1.105" style="width: 145px" />
+        </div>
+        <div>
+          <label>WS port</label
+          ><input id="port" value="9001" style="width: 65px" />
+        </div>
+        <div>
+          <label>Topic</label
+          ><input id="topic" value="stm32/sensors" style="width: 145px" />
+        </div>
+        <button class="btn btn-green" onclick="mqttConnect()">Connect</button>
+        <button class="btn btn-gray" onclick="mqttDisconnect()">
+          Disconnect
+        </button>
+      </div>
+
+      <div class="status-bar">
+        <div class="dot off" id="dot"></div>
+        <span id="status" class="mono">Disconnected</span>
+      </div>
+
+      <!-- Cards: temp, hum, LED -->
+      <div class="cards">
+        <div class="card ct">
+          <div class="lbl">Temperature</div>
+          <span class="val" id="v-temp" style="color: var(--tc)">--</span
+          ><span class="unit">°C</span>
+          <div class="minmax">
+            min <span id="t-min">--</span> · max <span id="t-max">--</span> °C
+          </div>
+        </div>
+        <div class="card ch">
+          <div class="lbl">Humidity</div>
+          <span class="val" id="v-hum" style="color: var(--hc)">--</span
+          ><span class="unit">%</span>
+          <div class="minmax">
+            min <span id="h-min">--</span> · max <span id="h-max">--</span> %
+          </div>
+        </div>
+        <div class="card" style="--cl: #22c55e">
+          <div class="lbl">STM32 LEDs</div>
+          <div class="led-row">
+            <div class="led led-b" id="led-b" title="Blue: T < 20°C"></div>
+            <div class="led led-g" id="led-g" title="Green: 20–30°C"></div>
+            <div class="led led-r" id="led-r" title="Red: T ≥ 30°C"></div>
+          </div>
+          <div style="font-size: 10px; color: var(--muted); margin-top: 8px">
+            B &lt;20 · G 20–30 · R ≥30 °C
+          </div>
+        </div>
+        <div class="card" style="--cl: #a78bfa">
+          <div class="lbl">Messages</div>
+          <span
+            class="val"
+            id="v-count"
+            style="color: #a78bfa; font-size: 1.8rem"
+            >0</span
+          >
+          <div class="minmax mono" id="v-last">--</div>
+        </div>
+      </div>
+
+      <!-- Gauges -->
+      <div class="gauges">
+        <div class="gcrd">
+          <h2>Temperature gauge</h2>
+          <svg
+            width="200"
+            height="120"
+            viewBox="0 0 200 120"
+            style="display: block; margin: auto"
+          >
+            <path
+              d="M20,100 A80,80 0 0,1 180,100"
+              fill="none"
+              stroke="#1a2235"
+              stroke-width="18"
+              stroke-linecap="round"
+            />
+            <path
+              id="t-arc"
+              d="M20,100 A80,80 0 0,1 180,100"
+              fill="none"
+              stroke="#f97316"
+              stroke-width="18"
+              stroke-linecap="round"
+              stroke-dasharray="251"
+              stroke-dashoffset="251"
+              style="transition: stroke-dashoffset 0.6s ease"
+            />
+            <text
+              id="t-gval"
+              x="100"
+              y="88"
+              text-anchor="middle"
+              font-size="26"
+              font-weight="700"
+              fill="#f97316"
+              font-family="Syne,sans-serif"
+            >
+              --
+            </text>
+            <text
+              x="100"
+              y="110"
+              text-anchor="middle"
+              font-size="10"
+              fill="#64748b"
+              font-family="Syne,sans-serif"
+            >
+              °C (0–50)
+            </text>
+          </svg>
+        </div>
+        <div class="gcrd">
+          <h2>Humidity gauge</h2>
+          <svg
+            width="200"
+            height="120"
+            viewBox="0 0 200 120"
+            style="display: block; margin: auto"
+          >
+            <path
+              d="M20,100 A80,80 0 0,1 180,100"
+              fill="none"
+              stroke="#1a2235"
+              stroke-width="18"
+              stroke-linecap="round"
+            />
+            <path
+              id="h-arc"
+              d="M20,100 A80,80 0 0,1 180,100"
+              fill="none"
+              stroke="#3b82f6"
+              stroke-width="18"
+              stroke-linecap="round"
+              stroke-dasharray="251"
+              stroke-dashoffset="251"
+              style="transition: stroke-dashoffset 0.6s ease"
+            />
+            <text
+              id="h-gval"
+              x="100"
+              y="88"
+              text-anchor="middle"
+              font-size="26"
+              font-weight="700"
+              fill="#3b82f6"
+              font-family="Syne,sans-serif"
+            >
+              --
+            </text>
+            <text
+              x="100"
+              y="110"
+              text-anchor="middle"
+              font-size="10"
+              fill="#64748b"
+              font-family="Syne,sans-serif"
+            >
+              % (0–100)
+            </text>
+          </svg>
+        </div>
+      </div>
+
+      <!-- Charts -->
+      <div class="charts">
+        <div class="ccrd">
+          <h2>Temperature history · last 50</h2>
+          <canvas id="tc" height="130"></canvas>
+        </div>
+        <div class="ccrd">
+          <h2>Humidity history · last 50</h2>
+          <canvas id="hc" height="130"></canvas>
+        </div>
+      </div>
+
+      <!-- Log -->
+      <div class="lcrd">
+        <div class="lcrd-hdr">
+          <h2>Live log</h2>
+          <button
+            class="btn btn-gray"
+            style="padding: 4px 12px; font-size: 11px"
+            onclick="document.getElementById('log').innerHTML = ''"
+          >
+            Clear
+          </button>
+        </div>
+        <div id="log">
+          <span class="mono" style="color: var(--muted)"
+            >Waiting for connection...</span
+          >
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════════════
+     PAGE 2 — IMPORT & ANALYSE
+     ════════════════════════════════════════════════════════════════════ -->
+    <div id="page-import" class="page">
+      <div class="hdr">
+        <div>
+          <h1>Import &amp; Analyse</h1>
+          <p>Load a CSV file exported from the live dashboard</p>
+        </div>
+        <div class="btn-row">
+          <button
+            class="btn btn-out"
+            id="btn-export-filtered"
+            style="display: none"
+            onclick="exportFiltered()"
+          >
+            ⬇ Export filtered
+          </button>
+        </div>
+      </div>
+
+      <!-- Drop zone -->
+      <div
+        class="import-zone"
+        id="drop-zone"
+        onclick="document.getElementById('file-input').click()"
+        ondragover="
+          event.preventDefault();
+          this.style.borderColor = 'var(--accent)';
+        "
+        ondragleave="this.style.borderColor = ''"
+        ondrop="handleDrop(event)"
+      >
+        <div class="icon">📂</div>
+        <div style="font-size: 14px; font-weight: 700; margin-top: 0.75rem">
+          Click to open or drag &amp; drop
+        </div>
+        <p>Accepts CSV files exported from this dashboard</p>
+        <p
+          style="
+            margin-top: 0.5rem;
+            font-size: 11px;
+            font-family: &quot;JetBrains Mono&quot;, monospace;
+          "
+        >
+          columns: timestamp · temperature_c · humidity_pct
+        </p>
+      </div>
+      <input
+        type="file"
+        id="file-input"
+        accept=".csv"
+        style="display: none"
+        onchange="loadFile(this.files[0])"
+      />
+
+      <!-- Filter row -->
+      <div
+        id="filter-row"
+        style="
+          display: none;
+          background: var(--surface);
+          border: 1px solid var(--border);
+          border-radius: 14px;
+          padding: 1rem 1.25rem;
+          margin-bottom: 1.5rem;
+          display: none;
+          gap: 12px;
+          align-items: flex-end;
+          flex-wrap: wrap;
+        "
+      >
+        <div>
+          <label
+            style="
+              font-size: 10px;
+              color: var(--muted);
+              display: block;
+              margin-bottom: 4px;
+              text-transform: uppercase;
+              letter-spacing: 0.05em;
+            "
+            >From</label
+          >
+          <input
+            type="datetime-local"
+            id="f-from"
+            style="
+              background: var(--sur2);
+              border: 1px solid var(--border);
+              border-radius: 8px;
+              padding: 6px 10px;
+              font-size: 12px;
+              color: var(--text);
+              font-family: &quot;JetBrains Mono&quot;, monospace;
+              outline: none;
+            "
+          />
+        </div>
+        <div>
+          <label
+            style="
+              font-size: 10px;
+              color: var(--muted);
+              display: block;
+              margin-bottom: 4px;
+              text-transform: uppercase;
+              letter-spacing: 0.05em;
+            "
+            >To</label
+          >
+          <input
+            type="datetime-local"
+            id="f-to"
+            style="
+              background: var(--sur2);
+              border: 1px solid var(--border);
+              border-radius: 8px;
+              padding: 6px 10px;
+              font-size: 12px;
+              color: var(--text);
+              font-family: &quot;JetBrains Mono&quot;, monospace;
+              outline: none;
+            "
+          />
+        </div>
+        <button class="btn btn-green" onclick="applyFilter()">
+          Apply filter
+        </button>
+        <button class="btn btn-gray" onclick="clearFilter()">Clear</button>
+      </div>
+
+      <!-- Stats -->
+      <div class="import-stats" id="i-stats" style="display: none">
+        <div class="istat">
+          <div class="lbl">Rows</div>
+          <div class="val" id="i-rows" style="color: #a78bfa">0</div>
+        </div>
+        <div class="istat">
+          <div class="lbl">Temp min</div>
+          <div class="val" id="i-tmin" style="color: var(--hc)">--</div>
+        </div>
+        <div class="istat">
+          <div class="lbl">Temp max</div>
+          <div class="val" id="i-tmax" style="color: var(--tc)">--</div>
+        </div>
+        <div class="istat">
+          <div class="lbl">Temp avg</div>
+          <div class="val" id="i-tavg" style="color: var(--warn)">--</div>
+        </div>
+        <div class="istat">
+          <div class="lbl">Hum min</div>
+          <div class="val" id="i-hmin" style="color: var(--hc)">--</div>
+        </div>
+        <div class="istat">
+          <div class="lbl">Hum max</div>
+          <div class="val" id="i-hmax" style="color: var(--tc)">--</div>
+        </div>
+        <div class="istat">
+          <div class="lbl">Hum avg</div>
+          <div class="val" id="i-havg" style="color: var(--warn)">--</div>
+        </div>
+        <div class="istat">
+          <div class="lbl">Duration</div>
+          <div
+            class="val"
+            id="i-dur"
+            style="font-size: 1rem; color: var(--muted)"
+          >
+            --
+          </div>
+        </div>
+      </div>
+
+      <!-- Import charts -->
+      <div class="charts" id="i-charts" style="display: none">
+        <div class="ccrd">
+          <h2>Temperature over time</h2>
+          <canvas id="i-tc" height="130"></canvas>
+        </div>
+        <div class="ccrd">
+          <h2>Humidity over time</h2>
+          <canvas id="i-hc" height="130"></canvas>
+        </div>
+      </div>
+
+      <!-- Data table -->
+      <div id="i-table-wrap" style="display: none">
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Timestamp</th>
+                <th>Temperature (°C)</th>
+                <th>Humidity (%)</th>
+              </tr>
+            </thead>
+            <tbody id="i-tbody"></tbody>
+          </table>
+        </div>
+        <div class="pagination">
+          <button id="p-prev" onclick="changePage(-1)" disabled>← Prev</button>
+          <span id="p-info">page 1 / 1</span>
+          <button id="p-next" onclick="changePage(1)">Next →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════════════
+     SCRIPTS
+     ════════════════════════════════════════════════════════════════════ -->
+    <script src="script.js"></script>
+  </body>
+</html>
