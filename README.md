@@ -35,7 +35,7 @@ A two-board embedded IoT system. The **STM32 Blue Pill** acts as UART master —
 
 ## Wiring diagram
 
-![System Overview](/docs/system_overview.jpg)
+![System Overview](https://drive.google.com/file/d/1tRHUJXq54mDhN2BEqbL4ciY0dBa4CfTw/view)
 
 ---
 
