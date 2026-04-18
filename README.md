@@ -3,6 +3,28 @@
 A two-board embedded IoT system. The **STM32 Blue Pill** acts as UART master — it drives LEDs and an LCD display based on temperature thresholds. The **ESP32** reads a DHT11 sensor, sends data to the STM32 over UART, publishes to a **Mosquitto MQTT broker**, and the data is visualised in a **standalone HTML dashboard** with CSV export and offline analysis.
 
 ---
+## Project structure
+
+```
+├── stm32/
+│   └── Core/
+│       ├── Inc/  (main.h · uart_comm.h · lcd_i2c.h)
+│       └── Src/  (main.c · uart_comm.c · lcd_i2c.c · stm32f1xx_hal_msp.c)
+├── esp32/
+│   └── main.ino
+├── mosquitto/
+│   └── mosquitto.conf
+├── dashboard/
+│   ├── index.html
+│   ├── style.css
+│   └── script.js
+├── docs/
+│   ├── system_overview.svg
+│   └── wiring_diagram.svg
+└── README.md
+```
+
+---
 
 ## System overview
 
@@ -179,27 +201,7 @@ File: `dashboard/index.html` — open in **Chrome or Edge**.
 - Paginated colour-coded data table
 - Export filtered subset as new CSV
 
----
 
-## Project structure
 
-```
-├── stm32/
-│   └── Core/
-│       ├── Inc/  (main.h · uart_comm.h · lcd_i2c.h)
-│       └── Src/  (main.c · uart_comm.c · lcd_i2c.c · stm32f1xx_hal_msp.c)
-├── esp32/
-│   └── main.ino
-├── mosquitto/
-│   └── mosquitto.conf
-├── dashboard/
-│   ├── index.html
-│   ├── style.css
-│   └── script.js
-├── docs/
-│   ├── system_overview.svg
-│   └── wiring_diagram.svg
-└── README.md
-```
 
 ---
